@@ -91,13 +91,22 @@ Generated outputs: - outputs/metrics.json - outputs/confusion_matrix.png
 -   If retraining the model, replace the waste_savedmodel folder.
 -   Do not upload .venv or node_modules to GitHub.
 
-## Model Download
+## Model Storage (Git LFS)
 
-The trained TensorFlow SavedModel is not included in this repository due to size limitations.
+The trained TensorFlow model is stored using Git Large File Storage (Git LFS).
 
-Download it here:
-[Download Waste Model](PASTE_YOUR_GOOGLE_DRIVE_LINK_HERE)
+To clone this repository with the model files:
 
-After downloading, extract it into:
+1. Install Git LFS:
+   https://git-lfs.github.com/
 
+2. Run:
+   git lfs install
+
+3. Clone the repository:
+   git clone https://github.com/NomanTahirBhatti/ai-waste-classification-system.git
+
+The model will automatically download during clone.
+
+Model location:
 model/waste_savedmodel/
