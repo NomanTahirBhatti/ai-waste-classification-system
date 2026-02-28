@@ -5,7 +5,7 @@ import os
 from typing import Any, Dict, List, Optional
 
 import numpy as np
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -19,6 +19,11 @@ from fastapi.responses import FileResponse
 
 # Input image size used during model training
 IMG_SIZE = (224, 224)
+MAX_UPLOAD_BYTES = 5 * 1024 * 1024  # 5 MB
+MAX_IMAGE_PIXELS = 20_000_000
+CHUNK_SIZE = 1024 * 1024
+
+Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
 
 # Waste categories (must match training dataset folder names)
 CLASS_NAMES = [
@@ -60,6 +65,13 @@ saved_model = None
 infer = None
 infer_input_key: Optional[str] = None
 infer_output_key: Optional[str] = None
+
+
+class RequestValidationError(Exception):
+    def __init__(self, status_code: int, message: str) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.message = message
 
 
 # ---------------------------------------------------------
@@ -119,13 +131,68 @@ def preprocess_image(file_bytes: bytes) -> np.ndarray:
     Convert uploaded image bytes into a normalized NumPy array
     compatible with the trained CNN model.
     """
-    img = Image.open(io.BytesIO(file_bytes)).convert("RGB")
-    img = img.resize(IMG_SIZE)
+    try:
+        with Image.open(io.BytesIO(file_bytes)) as img:
+            width, height = img.size
+            if width <= 0 or height <= 0:
+                raise RequestValidationError(400, "Invalid image dimensions.")
 
-    img_array = np.array(img).astype(np.float32) / 255.0
-    img_array = np.expand_dims(img_array, axis=0)
+            if width * height > MAX_IMAGE_PIXELS:
+                raise RequestValidationError(
+                    413,
+                    "Image resolution is too large. Use a lower-resolution image.",
+                )
 
-    return img_array
+            img = img.convert("RGB")
+            img = img.resize(IMG_SIZE)
+
+            img_array = np.array(img).astype(np.float32) / 255.0
+            img_array = np.expand_dims(img_array, axis=0)
+
+            return img_array
+    except RequestValidationError:
+        raise
+    except Image.DecompressionBombError:
+        raise RequestValidationError(
+            413,
+            "Image is too large to process safely.",
+        )
+    except UnidentifiedImageError:
+        raise RequestValidationError(
+            400,
+            "Invalid or unsupported image file.",
+        )
+    except OSError:
+        raise RequestValidationError(
+            400,
+            "Invalid or corrupted image file.",
+        )
+
+
+async def read_limited_upload(file: UploadFile, max_bytes: int) -> bytes:
+    """
+    Read upload stream in chunks and stop early when the file exceeds max_bytes.
+    """
+    total_size = 0
+    chunks: List[bytes] = []
+
+    while True:
+        chunk = await file.read(CHUNK_SIZE)
+        if not chunk:
+            break
+
+        total_size += len(chunk)
+        if total_size > max_bytes:
+            raise RequestValidationError(
+                413,
+                f"Uploaded file is too large. Maximum size is {max_bytes // (1024 * 1024)} MB.",
+            )
+        chunks.append(chunk)
+
+    if total_size == 0:
+        raise RequestValidationError(400, "Uploaded file is empty.")
+
+    return b"".join(chunks)
 
 
 # ---------------------------------------------------------
@@ -165,7 +232,13 @@ async def predict(file: UploadFile = File(...)) -> JSONResponse:
         )
 
     try:
-        file_bytes = await file.read()
+        if not file.content_type or not file.content_type.startswith("image/"):
+            raise RequestValidationError(
+                400,
+                "Only image files are allowed.",
+            )
+
+        file_bytes = await read_limited_upload(file, MAX_UPLOAD_BYTES)
         processed_image = preprocess_image(file_bytes)
 
         # Run inference via SavedModel signature
@@ -201,11 +274,17 @@ async def predict(file: UploadFile = File(...)) -> JSONResponse:
                 "all_probabilities": probability_list,
             }
         )
+    except RequestValidationError as e:
+        return JSONResponse(
+            status_code=e.status_code,
+            content={"error": e.message},
+        )
 
     except Exception as e:
+        print(f"[ERROR] Inference failed: {e}")
         return JSONResponse(
             status_code=400,
-            content={"error": f"Inference failed: {str(e)}"},
+            content={"error": "Inference failed."},
         )
 
 
