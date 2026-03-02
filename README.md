@@ -158,15 +158,8 @@ python evaluate.py
 
 ## Troubleshooting (Common Errors & Fixes)
 
-### A) PowerShell `mkdir ... cd ...` error
-PowerShell does **not** allow multiple commands in one `mkdir` line like Bash.
-Use separate lines:
-```powershell
-mkdir aiwaste-prototype
-cd aiwaste-prototype
-```
 
-### B) `tensorflow` install fails / “No matching distribution found”
+### A) `tensorflow` install fails / “No matching distribution found”
 Install and use **Python 3.11** (not 3.14). Then:
 ```powershell
 py -3.11 -m venv .venv
@@ -174,26 +167,8 @@ py -3.11 -m venv .venv
 pip install -r requirements.txt
 ```
 
-### C) `unicorn` not found
-Command is **uvicorn**, not unicorn:
-```powershell
-uvicorn main:app --reload
-```
 
-### D) `curl -F` fails in PowerShell
-PowerShell aliases `curl` to `Invoke-WebRequest`. Use one of these:
-
-**Option 1 (Git Bash):**
-```bash
-curl -F "file=@/c/Users/nomi9/Downloads/meta.jpg" http://127.0.0.1:8000/predict
-```
-
-**Option 2 (PowerShell using curl.exe):**
-```powershell
-curl.exe -F "file=@C:\Users\nomi9\Downloads\meta.jpg" http://127.0.0.1:8000/predict
-```
-
-### E) Model not loading (`model_loaded:false`)
+### B) Model not loading (`model_loaded:false`)
 Ensure this folder exists:
 ```
 model/waste_savedmodel/
@@ -202,40 +177,6 @@ If you cloned without LFS, run:
 ```bash
 git lfs pull
 ```
-
-### F) Keras/H5 load error: `Unrecognized keyword arguments: ['batch_shape']`
-This happens when a `.h5`/`.keras` file was saved with a different Keras/TensorFlow version.
-This prototype uses **SavedModel** for inference (`model/waste_savedmodel/`), which avoids that issue.
-
-### G) Web folder appears as submodule / “in unpopulated submodule 'web'”
-That means `web` was accidentally committed as a submodule.
-Fix: remove the submodule reference and re-add `web` as a normal folder (already resolved in this repo).
-
-### H) Deleted `.git` folder by mistake
-Re-clone the repository and copy your changes into the fresh clone. Then commit/push normally.
-```bash
-git clone https://github.com/NomanTahirBhatti/ai-waste-classification-system.git
-```
-
----
-
-## Submission ZIP (Recommended)
-
-For university submission, create a clean zip **excluding**:
-- `web/node_modules`
-- `web/.next`
-- `api/.venv`
-- `.git`
-
-Keep:
-- `api/` (source)
-- `web/` (source)
-- `model/waste_savedmodel/` (model)
-- `outputs/`
-- `README.md`
-- Prototype Report (PDF/DOCX)
-
----
 
 ## Notes
 - The model expects images resized to **224×224** and normalized to **[0,1]**.

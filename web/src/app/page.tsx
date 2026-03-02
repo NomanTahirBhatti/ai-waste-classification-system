@@ -398,7 +398,7 @@ export default function HomePage() {
   };
 
   return (
-    <main className="relative min-h-screen overflow-x-hidden px-4 py-8 md:px-8 md:py-12">
+    <main className="relative  min-h-screen overflow-x-hidden px-4 py-8 md:px-8 md:py-12">
       <div className="ambient-shape ambient-shape-a" />
       <div className="ambient-shape ambient-shape-b" />
 
